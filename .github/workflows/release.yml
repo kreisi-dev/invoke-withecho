@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create the GitHub release
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify tag matches module version
+        run: |
+          $manifest = Test-ModuleManifest ./InvokeWithEcho/InvokeWithEcho.psd1
+          $tag = '${{ github.ref_name }}'.TrimStart('v')
+          if ("$($manifest.Version)" -ne $tag) {
+            throw "Tag '${{ github.ref_name }}' does not match ModuleVersion $($manifest.Version)."
+          }
+
+      - name: Run Pester tests
+        run: |
+          Install-Module -Name Pester -MinimumVersion 5.5 -Force -SkipPublisherCheck -Scope CurrentUser
+          Invoke-Pester tests/ -CI
+
+      - name: Publish to the PowerShell Gallery
+        env:
+          PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+        run: Publish-PSResource -Path ./InvokeWithEcho -Repository PSGallery -ApiKey $env:PSGALLERY_API_KEY
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create '${{ github.ref_name }}' --title '${{ github.ref_name }}' --generate-notes --verify-tag
+        shell: bash
