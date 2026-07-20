@@ -1,0 +1,21 @@
+# PowerShell / build artifacts
+*.zip
+*.nupkg
+output/
+build/
+dist/
+
+# Test results (Pester)
+testResults*.xml
+coverage*.xml
+
+# Editor / IDE / tooling
+.vscode/
+.idea/
+.claude/
+*.swp
+*~
+
+# Operating system
+.DS_Store
+Thumbs.db

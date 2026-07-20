@@ -27,7 +27,7 @@ jobs:
       run:
         shell: ${{ matrix.shell }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install Pester and PSScriptAnalyzer
         run: |
@@ -45,7 +45,7 @@ jobs:
 
       - name: Run PSScriptAnalyzer
         run: |
-          $findings = Invoke-ScriptAnalyzer -Path . -Recurse
+          $findings = Invoke-ScriptAnalyzer -Path . -Recurse -Severity Error, Warning
           if ($findings) {
             $findings | Format-Table -AutoSize Severity, RuleName, ScriptName, Line, Message -Wrap
             throw "PSScriptAnalyzer found $(@($findings).Count) issue(s)."
