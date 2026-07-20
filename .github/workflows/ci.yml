@@ -51,3 +51,11 @@ jobs:
             throw "PSScriptAnalyzer found $(@($findings).Count) issue(s)."
           }
           'PSScriptAnalyzer: no findings.'
+
+      - name: Smoke-test the demo
+        run: |
+          ./examples/demo.ps1 -TranscriptPath "$env:RUNNER_TEMP/demo.log"
+          if (-not (Select-String -Path "$env:RUNNER_TEMP/demo.log" -Pattern '>> ' -Quiet)) {
+            throw 'Transcript contains no echo lines.'
+          }
+          'Smoke test passed: transcript contains echo lines.'

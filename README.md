@@ -65,6 +65,8 @@ Special cases:
 - Collections: `(a.csv, b.csv)` with the item count in the Count column; hashtables: `{k=v, …}`.
 - Undefined variables: Type and Count show `-`, Value shows `<not defined / null>` — incidentally reveals typos.
 - `SecureString`/`PSCredential`: `<masked>`.
+- Property and index assignments (`$obj.Prop = 5`, `$arr[0] = 5`) count as a read of the variable — the object's value is logged.
+- Increment/decrement (`$a++`) counts as a read; the pre-increment caller value is logged.
 
 ### Output target: `Write-Host` (information stream)
 
