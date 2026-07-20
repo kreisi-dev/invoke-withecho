@@ -13,7 +13,7 @@ Ausgabe (landet über den Information-Stream auch im Transcript):
 
 ```
 >> Get-ChildItem $quellPfad -Filter *.csv
-   $quellPfad = C:\daten\import
+   [String] $quellPfad = C:\daten\import
 ```
 
 ## Parameter

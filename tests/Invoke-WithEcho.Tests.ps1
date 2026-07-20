@@ -28,76 +28,77 @@ Describe 'Invoke-WithEcho' {
         $x | Should -Be @(2, 4, 6)
     }
 
-    It 'loggt Werte referenzierter Variablen als Zusatzzeile' {
+    It 'loggt Typ und Wert referenzierter Variablen als Zusatzzeile' {
         $pfad = 'C:\daten\import'
         $lines = Get-EchoOutput { Invoke-WithEcho { "$pfad" } | Out-Null }
-        $lines | Should -Contain '   $pfad = C:\daten\import'
+        $lines | Should -Contain '   [String] $pfad = C:\daten\import'
     }
 
     It 'kürzt Werte auf MaxValueLength Zeichen mit …-Suffix' {
         $lang = 'x' * 200
         $lines = Get-EchoOutput { Invoke-WithEcho { "$lang" } -MaxValueLength 10 | Out-Null }
-        $lines | Should -Contain ('   $lang = ' + ('x' * 10) + '…')
+        $lines | Should -Contain ('   [String] $lang = ' + ('x' * 10) + '…')
     }
 
     It 'kürzt bei Default-Länge auf 100 Zeichen' {
         $lang = 'x' * 200
         $lines = Get-EchoOutput { Invoke-WithEcho { "$lang" } | Out-Null }
-        $lines | Should -Contain ('   $lang = ' + ('x' * 100) + '…')
+        $lines | Should -Contain ('   [String] $lang = ' + ('x' * 100) + '…')
     }
 
     It 'formatiert Arrays mit Elementanzahl' {
         $dateien = 'a.csv', 'b.csv'
         $lines = Get-EchoOutput { Invoke-WithEcho { "$dateien" } | Out-Null }
-        $lines | Should -Contain '   $dateien = (a.csv, b.csv)  [2 Elemente]'
+        $lines | Should -Contain '   [Object[]] $dateien = (a.csv, b.csv)  [2 Elemente]'
     }
 
     It 'überspringt automatische Variablen wie $_' {
         $werte = 1, 2
         $lines = Get-EchoOutput { Invoke-WithEcho { $werte | ForEach-Object { $_ } } | Out-Null }
-        (@($lines) -match '^\s+\$_ =') | Should -BeNullOrEmpty
+        (@($lines) -match '\$_ =') | Should -BeNullOrEmpty
     }
 
     It 'loggt blocklokale Variablen nicht (Zuweisung vor erster Lesung)' {
         $lines = Get-EchoOutput { Invoke-WithEcho { $a = 5; Write-Host $a } | Out-Null }
-        (@($lines) -match '^\s+\$a =') | Should -BeNullOrEmpty
+        (@($lines) -match '^\s{3}.*\$a =') | Should -BeNullOrEmpty
         $lines | Should -Contain '5'
     }
 
     It 'loggt Variablen, die vor der Zuweisung gelesen werden ($a = $a + 1)' {
         $a = 41
         $lines = Get-EchoOutput { Invoke-WithEcho { $a = $a + 1; $a } | Out-Null }
-        $lines | Should -Contain '   $a = 41'
+        $lines | Should -Contain '   [Int32] $a = 41'
     }
 
     It 'loggt den Aufrufer-Wert bei zusammengesetzter Zuweisung (+=)' {
         $summe = 10
         $lines = Get-EchoOutput { Invoke-WithEcho { $summe += 1; $summe } | Out-Null }
-        $lines | Should -Contain '   $summe = 10'
+        $lines | Should -Contain '   [Int32] $summe = 10'
     }
 
     It 'loggt foreach-Laufvariablen nicht, wohl aber die durchlaufene Collection' {
         $dateien = 'a.csv', 'b.csv'
         $lines = Get-EchoOutput { Invoke-WithEcho { foreach ($f in $dateien) { $f } } | Out-Null }
-        (@($lines) -match '^\s+\$f =') | Should -BeNullOrEmpty
-        $lines | Should -Contain '   $dateien = (a.csv, b.csv)  [2 Elemente]'
+        (@($lines) -match '\$f =') | Should -BeNullOrEmpty
+        $lines | Should -Contain '   [Object[]] $dateien = (a.csv, b.csv)  [2 Elemente]'
     }
 
     It 'loggt nicht definierte Variablen als nicht-definiert-Platzhalter' {
         $lines = Get-EchoOutput { Invoke-WithEcho { "$gibtEsNicht" } | Out-Null }
         $lines | Should -Contain '   $gibtEsNicht = <nicht definiert / null>'
+        (@($lines) -match '\[\w+\] \$gibtEsNicht') | Should -BeNullOrEmpty
     }
 
     It 'maskiert SecureString-Werte' {
         $geheim = ConvertTo-SecureString 'hunter2' -AsPlainText -Force
         $lines = Get-EchoOutput { Invoke-WithEcho { "$geheim" } | Out-Null }
-        $lines | Should -Contain '   $geheim = <geheim>'
+        $lines | Should -Contain '   [SecureString] $geheim = <geheim>'
     }
 
     It 'unterdrückt Wertezeilen mit -NoExpand' {
         $pfad = 'C:\daten'
         $lines = Get-EchoOutput { Invoke-WithEcho { "$pfad" } -NoExpand | Out-Null }
-        (@($lines) -match '^\s{3}\$') | Should -BeNullOrEmpty
+        (@($lines) -match '^\s{3}\S') | Should -BeNullOrEmpty
     }
 
     It 'loggt mehrzeilige Blöcke zeilenweise mit normalisierter Einrückung' {

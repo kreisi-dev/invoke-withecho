@@ -63,8 +63,9 @@ function Invoke-WithEcho {
     .DESCRIPTION
         Der Befehlstext wird unverändert per Write-Host ausgegeben (Information-Stream:
         sichtbar in der Konsole, wird von Start-Transcript erfasst, per 6> umleitbar).
-        Darunter erscheinen die aktuellen Werte aller im Block referenzierten Variablen
-        als eingerückte Zusatzzeilen, pro Wert gekürzt auf -MaxValueLength Zeichen.
+        Darunter erscheinen Typ und aktueller Wert aller im Block referenzierten Variablen
+        als eingerückte Zusatzzeilen ("[String] $pfad = C:\daten"), pro Wert gekürzt
+        auf -MaxValueLength Zeichen.
         Die Auflösung liest nur Variablenwerte im Scope des Aufrufers und führt nichts aus.
 
         Die Pipeline-Ausgabe des Blocks wird unverändert durchgereicht. Zuweisungen
@@ -159,7 +160,8 @@ function Invoke-WithEcho {
 
         foreach ($name in $names) {
             try { $value = $PSCmdlet.GetVariableValue($name) } catch { continue }
-            Write-Host "   `$$name = $(Format-EchoValue -Value $value -MaxLength $MaxValueLength)" @valueStyle
+            $typePrefix = if ($null -ne $value) { "[$($value.GetType().Name)] " } else { '' }
+            Write-Host "   $typePrefix`$$name = $(Format-EchoValue -Value $value -MaxLength $MaxValueLength)" @valueStyle
         }
     }
 
