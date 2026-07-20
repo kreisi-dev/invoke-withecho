@@ -1,5 +1,5 @@
-﻿# Demo: Invoke-WithEcho in Kombination mit Start-Transcript.
-# Aufruf:  pwsh -NoProfile -File examples/demo.ps1 [-TranscriptPath <pfad>]
+﻿# Demo: Invoke-WithEcho combined with Start-Transcript.
+# Usage:  pwsh -NoProfile -File examples/demo.ps1 [-TranscriptPath <path>]
 param(
     [string] $TranscriptPath = (Join-Path ([System.IO.Path]::GetTempPath()) 'invoke-withecho-demo.log')
 )
@@ -8,21 +8,21 @@ Import-Module (Join-Path -Path $PSScriptRoot -ChildPath '..' -AdditionalChildPat
 
 Start-Transcript -Path $TranscriptPath -Force | Out-Null
 try {
-    $quellPfad = $PSScriptRoot
-    $muster    = '*.ps1'
+    $sourcePath = $PSScriptRoot
+    $pattern    = '*.ps1'
 
-    $dateien = Invoke-WithEcho { Get-ChildItem $quellPfad -Filter $muster }
+    $files = Invoke-WithEcho { Get-ChildItem $sourcePath -Filter $pattern }
 
     Invoke-WithEcho {
-        $dateien | ForEach-Object { "gefunden: $($_.Name)" }
+        $files | ForEach-Object { "found: $($_.Name)" }
     }
 
-    $langerText = 'Lorem ipsum dolor sit amet, ' * 10
-    $laenge = Invoke-WithEcho { $langerText.Length }
-    "Länge: $laenge"
+    $longText = 'Lorem ipsum dolor sit amet, ' * 10
+    $length = Invoke-WithEcho { $longText.Length }
+    "Length: $length"
 }
 finally {
     Stop-Transcript | Out-Null
 }
 
-"`nTranscript geschrieben nach: $TranscriptPath"
+"`nTranscript written to: $TranscriptPath"

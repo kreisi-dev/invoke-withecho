@@ -1,64 +1,64 @@
 # Invoke-WithEcho
 
-`ECHO ON` für PowerShell: führt einen ScriptBlock aus und loggt **vorher** den Befehlstext samt den aktuellen Werten der referenzierten Variablen. In Kombination mit `Start-Transcript` lässt sich damit im Log-File jeder Output dem auslösenden Befehl zuordnen — das, was DOS-Batchdateien mit `ECHO ON` immer konnten und PowerShell nicht bietet.
+ECHO ON for PowerShell: runs a script block and logs the command text **before** execution, together with type and current value of every variable the block reads. Combined with `Start-Transcript`, every piece of output in the log file can be attributed to the command that produced it — what DOS batch files always offered with `ECHO ON` and PowerShell does not.
 
 ```powershell
 Import-Module ./InvokeWithEcho/InvokeWithEcho.psd1
 
-$quellPfad = 'C:\daten\import'
-$dateien = Invoke-WithEcho { Get-ChildItem $quellPfad -Filter *.csv }
+$sourcePath = 'C:\data\import'
+$files = Invoke-WithEcho { Get-ChildItem $sourcePath -Filter *.csv }
 ```
 
-Ausgabe (landet über den Information-Stream auch im Transcript):
+Output (also lands in the transcript via the information stream):
 
 ```
->> Get-ChildItem $quellPfad -Filter *.csv
-   [String] $quellPfad = C:\daten\import
+>> Get-ChildItem $sourcePath -Filter *.csv
+   [String] $sourcePath = C:\data\import
 ```
 
-## Parameter
+## Parameters
 
-| Parameter | Default | Bedeutung |
+| Parameter | Default | Meaning |
 |---|---|---|
-| `-ScriptBlock` | (Pflicht, positional) | Der auszuführende Block. |
-| `-MaxValueLength` | `100` | Maximale Länge pro geloggtem Variablenwert; längere Werte enden mit `…`. |
-| `-NoExpand` | aus | Nur den Befehlstext loggen, keine Variablenwerte. |
-| `-CommandColor` | `Cyan` | Konsolenfarbe der `>>`-Befehlszeilen. |
-| `-ValueColor` | `DarkGray` | Konsolenfarbe der Variablen-Zusatzzeilen. |
-| `-NoColor` | aus | Echo-Zeilen in der Standardfarbe der Konsole ausgeben. |
+| `-ScriptBlock` | (mandatory, positional) | The block to execute. |
+| `-MaxValueLength` | `100` | Maximum length per logged variable value; longer values end with `…`. |
+| `-NoExpand` | off | Log only the command text, no variable values. |
+| `-CommandColor` | `Cyan` | Console color of the `>>` command lines. |
+| `-ValueColor` | `DarkGray` | Console color of the variable lines. |
+| `-NoColor` | off | Write echo lines in the console's default color. |
 
-Die Farben betreffen nur die Konsolen-Darstellung — im Transcript und bei `6>`-Umleitung steht reiner Text ohne Farbcodes.
+Colors affect console rendering only — the transcript and `6>` redirection receive plain text without color codes.
 
-## Design-Entscheidungen
+## Design decisions
 
-### Rückgabewert: `$x = Invoke-WithEcho { … }`, nicht `Invoke-WithEcho { $x = … }`
+### Return value: `$x = Invoke-WithEcho { … }`, not `Invoke-WithEcho { $x = … }`
 
-ScriptBlocks laufen in einem **Child-Scope** des Aufrufers. Eine Zuweisung im Block (`Invoke-WithEcho { $x = 5 }`) verpufft daher — `$x` ist nach dem Aufruf leer. Der Wrapper reicht stattdessen die Pipeline-Ausgabe des Blocks unverändert durch, sodass die Zuweisung wie bei `Measure-Command` oder `Invoke-Command` außen steht:
+Script blocks run in a **child scope** of the caller. An assignment inside the block (`Invoke-WithEcho { $x = 5 }`) therefore evaporates — `$x` is empty after the call. Instead, the wrapper passes the block's pipeline output through unchanged, so the assignment goes outside, as with `Measure-Command` or `Invoke-Command`:
 
 ```powershell
-$x = Invoke-WithEcho { Get-ChildItem $quellPfad }   # richtig
-Invoke-WithEcho { $x = Get-ChildItem $quellPfad }   # falsch: $x existiert danach nicht
+$x = Invoke-WithEcho { Get-ChildItem $sourcePath }   # correct
+Invoke-WithEcho { $x = Get-ChildItem $sourcePath }   # wrong: $x does not exist afterwards
 ```
 
-### Variablenauflösung: Befehl bleibt original, Werte als Zusatzzeilen
+### Variable resolution: command stays literal, values as extra lines
 
-Der Befehlstext wird 1:1 wie im Skript geloggt; die Werte stehen darunter. So bleibt der Code wiedererkennbar und lange Werte zerstören nicht die Befehlszeile. Die Auflösung geht über den AST des Blocks (`VariableExpressionAst`) und `$PSCmdlet.GetVariableValue()` — sie **liest nur** Variablen im Scope des Aufrufers und führt nichts aus (keine Subexpressions, keine Methodenaufrufe, keine doppelten Seiteneffekte).
+The command text is logged exactly as written; the values appear below it. The code stays recognizable and long values cannot wreck the command line. Resolution uses the block's AST (`VariableExpressionAst`) and `$PSCmdlet.GetVariableValue()` — it only **reads** variables in the caller's scope and never executes anything (no subexpressions, no method calls, no double side effects).
 
-Sonderfälle:
+Special cases:
 
-- Geloggt wird nur, was aus dem Aufrufer-Scope **gelesen** wird: blocklokale Variablen (`{ $a = 5; Write-Host $a }`) und `foreach`-Laufvariablen erzeugen keine Wertezeile. Wird eine Variable vor der Zuweisung gelesen (`$a = $a + 1`, `$summe += 1`), erscheint der Aufrufer-Wert.
-- Automatische Variablen (`$_`, `$null`, `$true`, `$args`, …) werden übersprungen.
-- Collections: `(a.csv, b.csv)  [2 Elemente]`, Hashtables: `{k=v, …}`.
-- Nicht definierte Variablen: `<nicht definiert / null>` — deckt nebenbei Tippfehler auf.
-- `SecureString`/`PSCredential`: `<geheim>`.
+- Only values **read** from the caller's scope are logged: block-local variables (`{ $a = 5; Write-Host $a }`) and `foreach` loop variables produce no value line. A variable read before assignment (`$a = $a + 1`, `$sum += 1`) shows the caller's value.
+- Automatic variables (`$_`, `$null`, `$true`, `$args`, …) are skipped.
+- Collections: `(a.csv, b.csv)  [2 items]`, hashtables: `{k=v, …}`.
+- Undefined variables: `<not defined / null>` — incidentally reveals typos.
+- `SecureString`/`PSCredential`: `<masked>`.
 
-### Ausgabeziel: `Write-Host` (Information-Stream)
+### Output target: `Write-Host` (information stream)
 
-Sichtbar in der Konsole, wird von `Start-Transcript` erfasst, per `6>` umleitbar (`6> echo.log`) oder unterdrückbar (`6> $null`) — und verschmutzt nie den Rückgabewert.
+Visible in the console, captured by `Start-Transcript`, redirectable with `6>` (`6> echo.log`) or suppressible (`6> $null`) — and never pollutes the return value.
 
-## Tests & Demo
+## Tests & demo
 
 ```powershell
-Invoke-Pester tests/                     # 12 Pester-Tests
-pwsh -NoProfile -File examples/demo.ps1  # Demo inkl. Start-Transcript
+Invoke-Pester tests/                     # 17 Pester tests
+pwsh -NoProfile -File examples/demo.ps1  # demo including Start-Transcript
 ```

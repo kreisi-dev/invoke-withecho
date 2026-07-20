@@ -1,5 +1,5 @@
-﻿# Automatische bzw. laufzeitgebundene Variablen, deren Wert im Echo-Log keinen
-# Mehrwert hat oder zum Aufrufzeitpunkt noch nicht existiert (z. B. $_ in einer Pipeline).
+﻿# Automatic or runtime-bound variables whose value adds no insight to the echo
+# log or does not exist yet at call time (e.g. $_ inside a pipeline).
 $script:SkipVariables = @(
     '_', 'PSItem', 'null', 'true', 'false', 'args', 'input', 'this',
     'foreach', 'switch', 'PSCmdlet', 'MyInvocation', 'PSBoundParameters',
@@ -10,8 +10,8 @@ $script:SkipVariables = @(
 function Format-EchoValue {
     param($Value, [int] $MaxLength)
 
-    if ($null -eq $Value) { return '<nicht definiert / null>' }
-    if ($Value -is [securestring] -or $Value -is [pscredential]) { return '<geheim>' }
+    if ($null -eq $Value) { return '<not defined / null>' }
+    if ($Value -is [securestring] -or $Value -is [pscredential]) { return '<masked>' }
 
     if ($Value -is [System.Collections.IDictionary]) {
         $pairs = $Value.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }
@@ -19,7 +19,7 @@ function Format-EchoValue {
     }
     elseif ($Value -is [System.Collections.IEnumerable] -and $Value -isnot [string]) {
         $items = @($Value)
-        $text = '(' + ($items -join ', ') + ")  [$($items.Count) Elemente]"
+        $text = '(' + ($items -join ', ') + ")  [$($items.Count) items]"
     }
     else {
         $text = "$Value"
@@ -30,10 +30,10 @@ function Format-EchoValue {
 }
 
 function Get-EchoVariableUse {
-    # Klassifiziert eine Variablen-Fundstelle: liest sie (potenziell) den Scope des
-    # Aufrufers, oder ist sie ein Schreibziel im Block? Beim Schreiben zählt als
-    # Zeitpunkt das Ende des Zuweisungs-Statements, weil die rechte Seite vorher
-    # ausgewertet wird ($a = $a + 1 liest den alten Wert).
+    # Classifies a variable occurrence: does it (potentially) read from the
+    # caller's scope, or is it an assignment target inside the block? A write
+    # takes effect at the end of its assignment statement because the right-hand
+    # side is evaluated first ($a = $a + 1 reads the old value).
     param([System.Management.Automation.Language.VariableExpressionAst] $Variable)
 
     $node = $Variable
@@ -58,45 +58,45 @@ function Get-EchoVariableUse {
 function Invoke-WithEcho {
     <#
     .SYNOPSIS
-        Führt einen ScriptBlock aus und loggt vorher den Befehlstext — wie ECHO ON in DOS-Batchdateien.
+        Runs a script block and logs the command text beforehand — like ECHO ON in DOS batch files.
 
     .DESCRIPTION
-        Der Befehlstext wird unverändert per Write-Host ausgegeben (Information-Stream:
-        sichtbar in der Konsole, wird von Start-Transcript erfasst, per 6> umleitbar).
-        Darunter erscheinen Typ und aktueller Wert aller im Block referenzierten Variablen
-        als eingerückte Zusatzzeilen ("[String] $pfad = C:\daten"), pro Wert gekürzt
-        auf -MaxValueLength Zeichen.
-        Die Auflösung liest nur Variablenwerte im Scope des Aufrufers und führt nichts aus.
+        The command text is written unchanged via Write-Host (information stream:
+        visible in the console, captured by Start-Transcript, redirectable with 6>).
+        Below it, type and current value of every variable the block reads appear
+        as indented extra lines ("[String] $path = C:\data"), each value truncated
+        to -MaxValueLength characters. Resolution only reads variable values in
+        the caller's scope and never executes anything.
 
-        Die Pipeline-Ausgabe des Blocks wird unverändert durchgereicht. Zuweisungen
-        gehören daher vor den Aufruf, nicht in den Block:
-            $x = Invoke-WithEcho { Get-ChildItem $path }   # richtig
-            Invoke-WithEcho { $x = Get-ChildItem $path }   # $x verpufft im Child-Scope
+        The block's pipeline output is passed through unchanged. Assignments
+        therefore belong outside the call, not inside the block:
+            $x = Invoke-WithEcho { Get-ChildItem $path }   # correct
+            Invoke-WithEcho { $x = Get-ChildItem $path }   # $x evaporates in the child scope
 
     .PARAMETER ScriptBlock
-        Der auszuführende Block.
+        The block to execute.
 
     .PARAMETER MaxValueLength
-        Maximale Länge pro geloggtem Variablenwert (Default 100), danach wird mit … gekürzt.
+        Maximum length per logged variable value (default 100); longer values end with ….
 
     .PARAMETER NoExpand
-        Unterdrückt die Variablen-Zusatzzeilen; nur der Befehlstext wird geloggt.
+        Suppresses the variable lines; only the command text is logged.
 
     .PARAMETER CommandColor
-        Konsolenfarbe der Befehlszeilen (Default: Cyan). Betrifft nur die Darstellung
-        in der Konsole; im Transcript steht reiner Text.
+        Console color of the command lines (default: Cyan). Affects console
+        rendering only; the transcript contains plain text.
 
     .PARAMETER ValueColor
-        Konsolenfarbe der Variablen-Zusatzzeilen (Default: DarkGray).
+        Console color of the variable lines (default: DarkGray).
 
     .PARAMETER NoColor
-        Gibt alle Echo-Zeilen in der Standardfarbe der Konsole aus.
+        Writes all echo lines in the console's default color.
 
     .EXAMPLE
-        $dateien = Invoke-WithEcho { Get-ChildItem $quellPfad -Filter *.csv }
+        $files = Invoke-WithEcho { Get-ChildItem $sourcePath -Filter *.csv }
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',
-        Justification = 'Write-Host ist hier Designentscheidung: Information-Stream wird von Start-Transcript erfasst, ist per 6> umleitbar und verschmutzt den Rückgabewert nicht.')]
+        Justification = 'Write-Host is a deliberate design decision here: the information stream is captured by Start-Transcript, redirectable with 6>, and never pollutes the return value.')]
     [CmdletBinding()]
     param(
         [Parameter(Mandatory, Position = 0)]
@@ -137,9 +137,9 @@ function Invoke-WithEcho {
             { param($node) $node -is [System.Management.Automation.Language.VariableExpressionAst] },
             $true) | Sort-Object { $_.Extent.StartOffset }
 
-        # Geloggt wird nur, was aus dem Aufrufer-Scope gelesen wird: eine Variable,
-        # deren erste Lesung nach einer abgeschlossenen Zuweisung im Block liegt,
-        # ist blocklokal und erscheint nicht.
+        # Only values read from the caller's scope are logged: a variable whose
+        # first read happens after a completed assignment inside the block is
+        # block-local and does not appear.
         $firstRead = @{}
         $firstWrite = @{}
         foreach ($occurrence in $occurrences) {

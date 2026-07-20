@@ -1,13 +1,13 @@
 ﻿[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingConvertToSecureStringWithPlainText', '',
-    Justification = 'Testcode: Dummy-SecureString mit fiktivem Wert, um die Maskierung als <geheim> zu prüfen.')]
+    Justification = 'Test code: dummy SecureString with a fictional value to verify masking as <masked>.')]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',
-    Justification = 'Testcode: Write-Host im Testblock stellt das reale Nutzungsszenario nach (Ausgabe in den Information-Stream).')]
+    Justification = 'Test code: Write-Host inside the test block mirrors the real usage scenario (output to the information stream).')]
 param()
 
 BeforeAll {
     Import-Module (Join-Path -Path $PSScriptRoot -ChildPath '..' -AdditionalChildPath 'InvokeWithEcho', 'InvokeWithEcho.psd1') -Force
 
-    # Fängt die Write-Host-Ausgabe (Information-Stream) eines Aufrufs als Textzeilen ab.
+    # Captures the Write-Host output (information stream) of a call as text lines.
     function Get-EchoOutput {
         param([scriptblock] $Call)
         (& $Call 6>&1) |
@@ -18,90 +18,90 @@ BeforeAll {
 
 Describe 'Invoke-WithEcho' {
 
-    It 'loggt den literalen Befehlstext mit >>-Präfix' {
+    It 'logs the literal command text with a >> prefix' {
         $lines = Get-EchoOutput { Invoke-WithEcho { Get-Date -Format yyyy } | Out-Null }
         $lines | Should -Contain '>> Get-Date -Format yyyy'
     }
 
-    It 'reicht den Rückgabewert unverändert durch' {
+    It 'passes the return value through unchanged' {
         $x = Invoke-WithEcho { 1..3 | ForEach-Object { $_ * 2 } } 6> $null
         $x | Should -Be @(2, 4, 6)
     }
 
-    It 'loggt Typ und Wert referenzierter Variablen als Zusatzzeile' {
-        $pfad = 'C:\daten\import'
-        $lines = Get-EchoOutput { Invoke-WithEcho { "$pfad" } | Out-Null }
-        $lines | Should -Contain '   [String] $pfad = C:\daten\import'
+    It 'logs type and value of referenced variables as an extra line' {
+        $path = 'C:\data\import'
+        $lines = Get-EchoOutput { Invoke-WithEcho { "$path" } | Out-Null }
+        $lines | Should -Contain '   [String] $path = C:\data\import'
     }
 
-    It 'kürzt Werte auf MaxValueLength Zeichen mit …-Suffix' {
-        $lang = 'x' * 200
-        $lines = Get-EchoOutput { Invoke-WithEcho { "$lang" } -MaxValueLength 10 | Out-Null }
-        $lines | Should -Contain ('   [String] $lang = ' + ('x' * 10) + '…')
+    It 'truncates values at MaxValueLength characters with an … suffix' {
+        $long = 'x' * 200
+        $lines = Get-EchoOutput { Invoke-WithEcho { "$long" } -MaxValueLength 10 | Out-Null }
+        $lines | Should -Contain ('   [String] $long = ' + ('x' * 10) + '…')
     }
 
-    It 'kürzt bei Default-Länge auf 100 Zeichen' {
-        $lang = 'x' * 200
-        $lines = Get-EchoOutput { Invoke-WithEcho { "$lang" } | Out-Null }
-        $lines | Should -Contain ('   [String] $lang = ' + ('x' * 100) + '…')
+    It 'truncates at 100 characters by default' {
+        $long = 'x' * 200
+        $lines = Get-EchoOutput { Invoke-WithEcho { "$long" } | Out-Null }
+        $lines | Should -Contain ('   [String] $long = ' + ('x' * 100) + '…')
     }
 
-    It 'formatiert Arrays mit Elementanzahl' {
-        $dateien = 'a.csv', 'b.csv'
-        $lines = Get-EchoOutput { Invoke-WithEcho { "$dateien" } | Out-Null }
-        $lines | Should -Contain '   [Object[]] $dateien = (a.csv, b.csv)  [2 Elemente]'
+    It 'formats arrays with their item count' {
+        $files = 'a.csv', 'b.csv'
+        $lines = Get-EchoOutput { Invoke-WithEcho { "$files" } | Out-Null }
+        $lines | Should -Contain '   [Object[]] $files = (a.csv, b.csv)  [2 items]'
     }
 
-    It 'überspringt automatische Variablen wie $_' {
-        $werte = 1, 2
-        $lines = Get-EchoOutput { Invoke-WithEcho { $werte | ForEach-Object { $_ } } | Out-Null }
+    It 'skips automatic variables such as $_' {
+        $values = 1, 2
+        $lines = Get-EchoOutput { Invoke-WithEcho { $values | ForEach-Object { $_ } } | Out-Null }
         (@($lines) -match '\$_ =') | Should -BeNullOrEmpty
     }
 
-    It 'loggt blocklokale Variablen nicht (Zuweisung vor erster Lesung)' {
+    It 'does not log block-local variables (assignment before first read)' {
         $lines = Get-EchoOutput { Invoke-WithEcho { $a = 5; Write-Host $a } | Out-Null }
         (@($lines) -match '^\s{3}.*\$a =') | Should -BeNullOrEmpty
         $lines | Should -Contain '5'
     }
 
-    It 'loggt Variablen, die vor der Zuweisung gelesen werden ($a = $a + 1)' {
+    It 'logs variables read before assignment ($a = $a + 1)' {
         $a = 41
         $lines = Get-EchoOutput { Invoke-WithEcho { $a = $a + 1; $a } | Out-Null }
         $lines | Should -Contain '   [Int32] $a = 41'
     }
 
-    It 'loggt den Aufrufer-Wert bei zusammengesetzter Zuweisung (+=)' {
-        $summe = 10
-        $lines = Get-EchoOutput { Invoke-WithEcho { $summe += 1; $summe } | Out-Null }
-        $lines | Should -Contain '   [Int32] $summe = 10'
+    It 'logs the caller value for compound assignment (+=)' {
+        $sum = 10
+        $lines = Get-EchoOutput { Invoke-WithEcho { $sum += 1; $sum } | Out-Null }
+        $lines | Should -Contain '   [Int32] $sum = 10'
     }
 
-    It 'loggt foreach-Laufvariablen nicht, wohl aber die durchlaufene Collection' {
-        $dateien = 'a.csv', 'b.csv'
-        $lines = Get-EchoOutput { Invoke-WithEcho { foreach ($f in $dateien) { $f } } | Out-Null }
+    It 'does not log foreach loop variables, but does log the traversed collection' {
+        $files = 'a.csv', 'b.csv'
+        $lines = Get-EchoOutput { Invoke-WithEcho { foreach ($f in $files) { $f } } | Out-Null }
         (@($lines) -match '\$f =') | Should -BeNullOrEmpty
-        $lines | Should -Contain '   [Object[]] $dateien = (a.csv, b.csv)  [2 Elemente]'
+        $lines | Should -Contain '   [Object[]] $files = (a.csv, b.csv)  [2 items]'
     }
 
-    It 'loggt nicht definierte Variablen als nicht-definiert-Platzhalter' {
-        $lines = Get-EchoOutput { Invoke-WithEcho { "$gibtEsNicht" } | Out-Null }
-        $lines | Should -Contain '   $gibtEsNicht = <nicht definiert / null>'
-        (@($lines) -match '\[\w+\] \$gibtEsNicht') | Should -BeNullOrEmpty
+    It 'logs undefined variables with a not-defined placeholder' {
+        $lines = Get-EchoOutput { Invoke-WithEcho { "$doesNotExist" } | Out-Null }
+        $lines | Should -Contain '   $doesNotExist = <not defined / null>'
+        (@($lines) -match '\[\w+\] \$doesNotExist') | Should -BeNullOrEmpty
     }
 
-    It 'maskiert SecureString-Werte' {
-        $geheim = ConvertTo-SecureString 'hunter2' -AsPlainText -Force
-        $lines = Get-EchoOutput { Invoke-WithEcho { "$geheim" } | Out-Null }
-        $lines | Should -Contain '   [SecureString] $geheim = <geheim>'
+    It 'masks SecureString values' {
+        $secret = ConvertTo-SecureString 'hunter2' -AsPlainText -Force
+        $lines = Get-EchoOutput { Invoke-WithEcho { "$secret" } | Out-Null }
+        $lines | Should -Contain '   [SecureString] $secret = <masked>'
     }
 
-    It 'unterdrückt Wertezeilen mit -NoExpand' {
-        $pfad = 'C:\daten'
-        $lines = Get-EchoOutput { Invoke-WithEcho { "$pfad" } -NoExpand | Out-Null }
+    It 'suppresses value lines with -NoExpand' {
+        $path = 'C:\data'
+        $lines = Get-EchoOutput { Invoke-WithEcho { "$path" } -NoExpand | Out-Null }
         (@($lines) -match '^\s{3}\S') | Should -BeNullOrEmpty
     }
 
-    It 'loggt mehrzeilige Blöcke zeilenweise mit normalisierter Einrückung' {
+    It 'logs multi-line blocks line by line with normalized indentation' {
         $lines = Get-EchoOutput {
             Invoke-WithEcho {
                 $a = 1
@@ -112,15 +112,15 @@ Describe 'Invoke-WithEcho' {
         $lines | Should -Contain '>> $a + 1'
     }
 
-    It 'hält Farbcodes aus dem Information-Stream-Text heraus' {
-        $pfad = 'C:\daten'
-        $farbig = Get-EchoOutput { Invoke-WithEcho { "$pfad" } | Out-Null }
-        $ohne = Get-EchoOutput { Invoke-WithEcho { "$pfad" } -NoColor | Out-Null }
-        $farbig | Should -Be $ohne
-        (@($farbig) -match "`e") | Should -BeNullOrEmpty
+    It 'keeps color codes out of the information stream text' {
+        $path = 'C:\data'
+        $colored = Get-EchoOutput { Invoke-WithEcho { "$path" } | Out-Null }
+        $plain = Get-EchoOutput { Invoke-WithEcho { "$path" } -NoColor | Out-Null }
+        $colored | Should -Be $plain
+        (@($colored) -match "`e") | Should -BeNullOrEmpty
     }
 
-    It 'propagiert Fehler aus dem Block an den Aufrufer' {
-        { Invoke-WithEcho { throw 'kaputt' } 6> $null } | Should -Throw 'kaputt'
+    It 'propagates errors from the block to the caller' {
+        { Invoke-WithEcho { throw 'broken' } 6> $null } | Should -Throw 'broken'
     }
 }
