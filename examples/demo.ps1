@@ -4,7 +4,8 @@ param(
     [string] $TranscriptPath = (Join-Path ([System.IO.Path]::GetTempPath()) 'invoke-withecho-demo.log')
 )
 
-Import-Module (Join-Path -Path $PSScriptRoot -ChildPath '..' -AdditionalChildPath 'InvokeWithEcho', 'InvokeWithEcho.psd1') -Force
+# Single -ChildPath with separators: -AdditionalChildPath does not exist in PowerShell 5.1
+Import-Module (Join-Path -Path $PSScriptRoot -ChildPath '../InvokeWithEcho/InvokeWithEcho.psd1') -Force
 
 Start-Transcript -Path $TranscriptPath -Force | Out-Null
 try {

@@ -1,5 +1,7 @@
 # Invoke-WithEcho
 
+[![CI](https://github.com/kreisi-dev/invoke-withecho/actions/workflows/ci.yml/badge.svg)](https://github.com/kreisi-dev/invoke-withecho/actions/workflows/ci.yml)
+
 ECHO ON for PowerShell: runs a script block and logs the command text **before** execution, together with type and current value of every variable the block reads. Combined with `Start-Transcript`, every piece of output in the log file can be attributed to the command that produced it — what DOS batch files always offered with `ECHO ON` and PowerShell does not.
 
 ```powershell

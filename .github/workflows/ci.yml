@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: pwsh on Linux
+            os: ubuntu-latest
+            shell: pwsh
+          - name: pwsh on Windows
+            os: windows-latest
+            shell: pwsh
+          - name: Windows PowerShell 5.1
+            os: windows-latest
+            shell: powershell
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Pester and PSScriptAnalyzer
+        shell: ${{ matrix.shell }}
+        run: |
+          if ($PSVersionTable.PSEdition -eq 'Desktop') {
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            Install-PackageProvider -Name NuGet -Force -Scope CurrentUser | Out-Null
+          }
+          Install-Module -Name Pester -MinimumVersion 5.5 -Force -SkipPublisherCheck -Scope CurrentUser
+          Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser
+
+      - name: Run Pester tests
+        shell: ${{ matrix.shell }}
+        run: |
+          Import-Module Pester -MinimumVersion 5.5
+          Invoke-Pester tests/ -CI
+
+      - name: Run PSScriptAnalyzer
+        shell: ${{ matrix.shell }}
+        run: |
+          $findings = Invoke-ScriptAnalyzer -Path . -Recurse
+          if ($findings) {
+            $findings | Format-Table -AutoSize Severity, RuleName, ScriptName, Line, Message -Wrap
+            throw "PSScriptAnalyzer found $(@($findings).Count) issue(s)."
+          }
+          'PSScriptAnalyzer: no findings.'

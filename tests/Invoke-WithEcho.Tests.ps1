@@ -5,7 +5,8 @@
 param()
 
 BeforeAll {
-    Import-Module (Join-Path -Path $PSScriptRoot -ChildPath '..' -AdditionalChildPath 'InvokeWithEcho', 'InvokeWithEcho.psd1') -Force
+    # Single -ChildPath with separators: -AdditionalChildPath does not exist in PowerShell 5.1
+    Import-Module (Join-Path -Path $PSScriptRoot -ChildPath '../InvokeWithEcho/InvokeWithEcho.psd1') -Force
 
     # Captures the Write-Host output (information stream) of a call as text lines.
     function Get-EchoOutput {
@@ -128,7 +129,7 @@ Describe 'Invoke-WithEcho' {
         $colored = Get-EchoOutput { Invoke-WithEcho { "$path" } | Out-Null }
         $plain = Get-EchoOutput { Invoke-WithEcho { "$path" } -NoColor | Out-Null }
         $colored | Should -Be $plain
-        (@($colored) -match "`e") | Should -BeNullOrEmpty
+        (@($colored) -match '\x1b') | Should -BeNullOrEmpty
     }
 
     It 'propagates errors from the block to the caller' {
