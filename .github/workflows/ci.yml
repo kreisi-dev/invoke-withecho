@@ -22,11 +22,14 @@ jobs:
           - name: Windows PowerShell 5.1
             os: windows-latest
             shell: powershell
+    # steps[*].shell does not allow matrix expressions, job-level defaults do
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Pester and PSScriptAnalyzer
-        shell: ${{ matrix.shell }}
         run: |
           if ($PSVersionTable.PSEdition -eq 'Desktop') {
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -36,13 +39,11 @@ jobs:
           Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser
 
       - name: Run Pester tests
-        shell: ${{ matrix.shell }}
         run: |
           Import-Module Pester -MinimumVersion 5.5
           Invoke-Pester tests/ -CI
 
       - name: Run PSScriptAnalyzer
-        shell: ${{ matrix.shell }}
         run: |
           $findings = Invoke-ScriptAnalyzer -Path . -Recurse
           if ($findings) {
