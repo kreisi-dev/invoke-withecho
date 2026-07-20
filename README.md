@@ -13,7 +13,9 @@ Output (also lands in the transcript via the information stream):
 
 ```
 >> Get-ChildItem $sourcePath -Filter *.csv
-   [String] $sourcePath = C:\data\import
+   Variable     Type    Count  Value
+   --------     ----    -----  -----
+   $sourcePath  String      1  C:\data\import
 ```
 
 ## Parameters
@@ -40,16 +42,17 @@ $x = Invoke-WithEcho { Get-ChildItem $sourcePath }   # correct
 Invoke-WithEcho { $x = Get-ChildItem $sourcePath }   # wrong: $x does not exist afterwards
 ```
 
-### Variable resolution: command stays literal, values as extra lines
+### Variable resolution: command stays literal, values as a table below
 
-The command text is logged exactly as written; the values appear below it. The code stays recognizable and long values cannot wreck the command line. Resolution uses the block's AST (`VariableExpressionAst`) and `$PSCmdlet.GetVariableValue()` — it only **reads** variables in the caller's scope and never executes anything (no subexpressions, no method calls, no double side effects).
+The command text is logged exactly as written; the values appear below it as an aligned table (Variable, Type, Count, Value). The code stays recognizable and long values cannot wreck the command line. Resolution uses the block's AST (`VariableExpressionAst`) and `$PSCmdlet.GetVariableValue()` — it only **reads** variables in the caller's scope and never executes anything (no subexpressions, no method calls, no double side effects).
 
 Special cases:
 
 - Only values **read** from the caller's scope are logged: block-local variables (`{ $a = 5; Write-Host $a }`) and `foreach` loop variables produce no value line. A variable read before assignment (`$a = $a + 1`, `$sum += 1`) shows the caller's value.
 - Automatic variables (`$_`, `$null`, `$true`, `$args`, …) are skipped.
-- Collections: `(a.csv, b.csv)  [2 items]`, hashtables: `{k=v, …}`.
-- Undefined variables: `<not defined / null>` — incidentally reveals typos.
+- Values are collapsed to a single line (newlines become spaces) and truncated at `-MaxValueLength`.
+- Collections: `(a.csv, b.csv)` with the item count in the Count column; hashtables: `{k=v, …}`.
+- Undefined variables: Type and Count show `-`, Value shows `<not defined / null>` — incidentally reveals typos.
 - `SecureString`/`PSCredential`: `<masked>`.
 
 ### Output target: `Write-Host` (information stream)
@@ -59,6 +62,6 @@ Visible in the console, captured by `Start-Transcript`, redirectable with `6>` (
 ## Tests & demo
 
 ```powershell
-Invoke-Pester tests/                     # 17 Pester tests
+Invoke-Pester tests/                     # 19 Pester tests
 pwsh -NoProfile -File examples/demo.ps1  # demo including Start-Transcript
 ```

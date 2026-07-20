@@ -28,74 +28,85 @@ Describe 'Invoke-WithEcho' {
         $x | Should -Be @(2, 4, 6)
     }
 
-    It 'logs type and value of referenced variables as an extra line' {
+    It 'prints a table header above the variable rows' {
         $path = 'C:\data\import'
         $lines = Get-EchoOutput { Invoke-WithEcho { "$path" } | Out-Null }
-        $lines | Should -Contain '   [String] $path = C:\data\import'
+        (@($lines) -match '^\s{3}Variable\s+Type\s+Count\s+Value$') | Should -Not -BeNullOrEmpty
+    }
+
+    It 'logs referenced variables as a table row with name, type, count, and value' {
+        $path = 'C:\data\import'
+        $lines = Get-EchoOutput { Invoke-WithEcho { "$path" } | Out-Null }
+        (@($lines) -match '^\s{3}\$path\s+String\s+1\s+C:\\data\\import$') | Should -Not -BeNullOrEmpty
     }
 
     It 'truncates values at MaxValueLength characters with an … suffix' {
         $long = 'x' * 200
         $lines = Get-EchoOutput { Invoke-WithEcho { "$long" } -MaxValueLength 10 | Out-Null }
-        $lines | Should -Contain ('   [String] $long = ' + ('x' * 10) + '…')
+        (@($lines) -match ('\$long\s+String\s+1\s+' + ('x' * 10) + '…$')) | Should -Not -BeNullOrEmpty
     }
 
     It 'truncates at 100 characters by default' {
         $long = 'x' * 200
         $lines = Get-EchoOutput { Invoke-WithEcho { "$long" } | Out-Null }
-        $lines | Should -Contain ('   [String] $long = ' + ('x' * 100) + '…')
+        (@($lines) -match ('\$long\s+String\s+1\s+' + ('x' * 100) + '…$')) | Should -Not -BeNullOrEmpty
     }
 
-    It 'formats arrays with their item count' {
+    It 'formats arrays with their item count in the Count column' {
         $files = 'a.csv', 'b.csv'
         $lines = Get-EchoOutput { Invoke-WithEcho { "$files" } | Out-Null }
-        $lines | Should -Contain '   [Object[]] $files = (a.csv, b.csv)  [2 items]'
+        (@($lines) -match '^\s{3}\$files\s+Object\[\]\s+2\s+\(a\.csv, b\.csv\)$') | Should -Not -BeNullOrEmpty
+    }
+
+    It 'collapses multi-line values to a single line' {
+        $text = "line1`nline2"
+        $lines = Get-EchoOutput { Invoke-WithEcho { "$text" } | Out-Null }
+        (@($lines) -match '^\s{3}\$text\s+String\s+1\s+line1 line2$') | Should -Not -BeNullOrEmpty
     }
 
     It 'skips automatic variables such as $_' {
         $values = 1, 2
         $lines = Get-EchoOutput { Invoke-WithEcho { $values | ForEach-Object { $_ } } | Out-Null }
-        (@($lines) -match '\$_ =') | Should -BeNullOrEmpty
+        (@($lines) -match '^\s{3}\$_\s') | Should -BeNullOrEmpty
     }
 
     It 'does not log block-local variables (assignment before first read)' {
         $lines = Get-EchoOutput { Invoke-WithEcho { $a = 5; Write-Host $a } | Out-Null }
-        (@($lines) -match '^\s{3}.*\$a =') | Should -BeNullOrEmpty
+        (@($lines) -match '^\s{3}') | Should -BeNullOrEmpty
         $lines | Should -Contain '5'
     }
 
     It 'logs variables read before assignment ($a = $a + 1)' {
         $a = 41
         $lines = Get-EchoOutput { Invoke-WithEcho { $a = $a + 1; $a } | Out-Null }
-        $lines | Should -Contain '   [Int32] $a = 41'
+        (@($lines) -match '^\s{3}\$a\s+Int32\s+1\s+41$') | Should -Not -BeNullOrEmpty
     }
 
     It 'logs the caller value for compound assignment (+=)' {
         $sum = 10
         $lines = Get-EchoOutput { Invoke-WithEcho { $sum += 1; $sum } | Out-Null }
-        $lines | Should -Contain '   [Int32] $sum = 10'
+        (@($lines) -match '^\s{3}\$sum\s+Int32\s+1\s+10$') | Should -Not -BeNullOrEmpty
     }
 
     It 'does not log foreach loop variables, but does log the traversed collection' {
         $files = 'a.csv', 'b.csv'
         $lines = Get-EchoOutput { Invoke-WithEcho { foreach ($f in $files) { $f } } | Out-Null }
-        (@($lines) -match '\$f =') | Should -BeNullOrEmpty
-        $lines | Should -Contain '   [Object[]] $files = (a.csv, b.csv)  [2 items]'
+        (@($lines) -match '^\s{3}\$f\s') | Should -BeNullOrEmpty
+        (@($lines) -match '^\s{3}\$files\s+Object\[\]\s+2\s+\(a\.csv, b\.csv\)$') | Should -Not -BeNullOrEmpty
     }
 
-    It 'logs undefined variables with a not-defined placeholder' {
+    It 'logs undefined variables with dashes and a not-defined placeholder' {
         $lines = Get-EchoOutput { Invoke-WithEcho { "$doesNotExist" } | Out-Null }
-        $lines | Should -Contain '   $doesNotExist = <not defined / null>'
-        (@($lines) -match '\[\w+\] \$doesNotExist') | Should -BeNullOrEmpty
+        (@($lines) -match '^\s{3}\$doesNotExist\s+-\s+-\s+<not defined / null>$') | Should -Not -BeNullOrEmpty
     }
 
     It 'masks SecureString values' {
         $secret = ConvertTo-SecureString 'hunter2' -AsPlainText -Force
         $lines = Get-EchoOutput { Invoke-WithEcho { "$secret" } | Out-Null }
-        $lines | Should -Contain '   [SecureString] $secret = <masked>'
+        (@($lines) -match '^\s{3}\$secret\s+SecureString\s+1\s+<masked>$') | Should -Not -BeNullOrEmpty
     }
 
-    It 'suppresses value lines with -NoExpand' {
+    It 'suppresses the variable table with -NoExpand' {
         $path = 'C:\data'
         $lines = Get-EchoOutput { Invoke-WithEcho { "$path" } -NoExpand | Out-Null }
         (@($lines) -match '^\s{3}\S') | Should -BeNullOrEmpty

@@ -18,13 +18,13 @@ function Format-EchoValue {
         $text = '{' + ($pairs -join ', ') + '}'
     }
     elseif ($Value -is [System.Collections.IEnumerable] -and $Value -isnot [string]) {
-        $items = @($Value)
-        $text = '(' + ($items -join ', ') + ")  [$($items.Count) items]"
+        $text = '(' + (@($Value) -join ', ') + ')'
     }
     else {
         $text = "$Value"
     }
 
+    $text = $text -replace '\r?\n', ' '   # keep the table row on a single line
     if ($text.Length -gt $MaxLength) { $text = $text.Substring(0, $MaxLength) + '…' }
     return $text
 }
@@ -63,10 +63,10 @@ function Invoke-WithEcho {
     .DESCRIPTION
         The command text is written unchanged via Write-Host (information stream:
         visible in the console, captured by Start-Transcript, redirectable with 6>).
-        Below it, type and current value of every variable the block reads appear
-        as indented extra lines ("[String] $path = C:\data"), each value truncated
-        to -MaxValueLength characters. Resolution only reads variable values in
-        the caller's scope and never executes anything.
+        Below it, every variable the block reads appears as a row in an indented
+        table (Variable, Type, Count, Value), the value collapsed to a single
+        line and truncated to -MaxValueLength characters. Resolution only reads
+        variable values in the caller's scope and never executes anything.
 
         The block's pipeline output is passed through unchanged. Assignments
         therefore belong outside the call, not inside the block:
@@ -158,10 +158,30 @@ function Invoke-WithEcho {
             -not $firstWrite.ContainsKey($_) -or $firstRead[$_] -lt $firstWrite[$_]
         } | Sort-Object
 
-        foreach ($name in $names) {
+        $rows = foreach ($name in $names) {
             try { $value = $PSCmdlet.GetVariableValue($name) } catch { continue }
-            $typePrefix = if ($null -ne $value) { "[$($value.GetType().Name)] " } else { '' }
-            Write-Host "   $typePrefix`$$name = $(Format-EchoValue -Value $value -MaxLength $MaxValueLength)" @valueStyle
+            $itemCount = if ($null -eq $value) { '-' }
+                elseif ($value -is [System.Collections.IDictionary]) { "$($value.Count)" }
+                elseif ($value -is [System.Collections.IEnumerable] -and $value -isnot [string]) { "$(@($value).Count)" }
+                else { '1' }
+            [pscustomobject]@{
+                Name      = "`$$name"
+                Type      = if ($null -eq $value) { '-' } else { $value.GetType().Name }
+                ItemCount = $itemCount
+                Value     = Format-EchoValue -Value $value -MaxLength $MaxValueLength
+            }
+        }
+
+        if ($rows) {
+            $nameWidth  = (@('Variable') + @($rows.Name)      | Measure-Object -Property Length -Maximum).Maximum
+            $typeWidth  = (@('Type')     + @($rows.Type)      | Measure-Object -Property Length -Maximum).Maximum
+            $countWidth = (@('Count')    + @($rows.ItemCount) | Measure-Object -Property Length -Maximum).Maximum
+            $rowFormat  = "   {0,-$nameWidth}  {1,-$typeWidth}  {2,$countWidth}  {3}"
+            Write-Host ($rowFormat -f 'Variable', 'Type', 'Count', 'Value') @valueStyle
+            Write-Host ($rowFormat -f ('-' * 8), ('-' * 4), ('-' * 5), ('-' * 5)) @valueStyle
+            foreach ($row in $rows) {
+                Write-Host ($rowFormat -f $row.Name, $row.Type, $row.ItemCount, $row.Value) @valueStyle
+            }
         }
     }
 
