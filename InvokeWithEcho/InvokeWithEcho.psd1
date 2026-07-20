@@ -12,7 +12,7 @@
     PrivateData       = @{
         PSData = @{
             Tags       = @('logging', 'echo', 'transcript', 'trace')
-            ProjectUri = 'https://github.com/kreisi/invoke-withecho'
+            ProjectUri = 'https://github.com/kreisi-dev/invoke-withecho'
         }
     }
 }
