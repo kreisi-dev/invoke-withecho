@@ -4,8 +4,17 @@
 
 ECHO ON for PowerShell: runs a script block and logs the command text **before** execution, together with type and current value of every variable the block reads. Combined with `Start-Transcript`, every piece of output in the log file can be attributed to the command that produced it — what DOS batch files always offered with `ECHO ON` and PowerShell does not.
 
+## Installation
+
 ```powershell
-Import-Module ./InvokeWithEcho/InvokeWithEcho.psd1
+Install-Module InvokeWithEcho          # PowerShellGet
+Install-PSResource InvokeWithEcho     # or PSResourceGet
+```
+
+## Usage
+
+```powershell
+Import-Module InvokeWithEcho
 
 $sourcePath = 'C:\data\import'
 $files = Invoke-WithEcho { Get-ChildItem $sourcePath -Filter *.csv }
