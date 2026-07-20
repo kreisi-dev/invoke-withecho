@@ -12,8 +12,8 @@
     PrivateData       = @{
         PSData = @{
             Tags       = @('logging', 'echo', 'transcript', 'trace')
-            ProjectUri = 'https://github.com/kreisi-dev/invoke-withecho'
-            LicenseUri = 'https://github.com/kreisi-dev/invoke-withecho/blob/main/LICENSE'
+            ProjectUri = 'https://github.com/kreisi-dev/Invoke-WithEcho'
+            LicenseUri = 'https://github.com/kreisi-dev/Invoke-WithEcho/blob/main/LICENSE'
         }
     }
 }

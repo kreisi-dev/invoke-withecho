@@ -1,7 +1,7 @@
 ﻿# Demo: Invoke-WithEcho combined with Start-Transcript.
 # Usage:  pwsh -NoProfile -File examples/demo.ps1 [-TranscriptPath <path>]
 param(
-    [string] $TranscriptPath = (Join-Path ([System.IO.Path]::GetTempPath()) 'invoke-withecho-demo.log')
+    [string] $TranscriptPath = (Join-Path ([System.IO.Path]::GetTempPath()) 'Invoke-WithEcho-demo.log')
 )
 
 # Single -ChildPath with separators: -AdditionalChildPath does not exist in PowerShell 5.1
