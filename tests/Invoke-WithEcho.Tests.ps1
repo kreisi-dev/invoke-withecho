@@ -96,6 +96,20 @@ Describe 'Invoke-WithEcho' {
         (@($lines) -match '^\s{3}\$files\s+Object\[\]\s+2\s+\(a\.csv, b\.csv\)$') | Should -Not -BeNullOrEmpty
     }
 
+    It 'resolves scope-prefixed variables in the caller''s scope, not the module''s' {
+        $script:scopedCfg = 'from-script-scope'
+        $global:scopedGlobal = 'from-global-scope'
+        try {
+            $lines = Get-EchoOutput { Invoke-WithEcho { "$script:scopedCfg $global:scopedGlobal" } | Out-Null }
+            (@($lines) -match '^\s{3}\$script:scopedCfg\s+String\s+1\s+from-script-scope$') | Should -Not -BeNullOrEmpty
+            (@($lines) -match '^\s{3}\$global:scopedGlobal\s+String\s+1\s+from-global-scope$') | Should -Not -BeNullOrEmpty
+        }
+        finally {
+            Remove-Variable -Name scopedGlobal -Scope Global -ErrorAction SilentlyContinue
+            Remove-Variable -Name scopedCfg -Scope Script -ErrorAction SilentlyContinue
+        }
+    }
+
     It 'logs undefined variables with dashes and a not-defined placeholder' {
         $lines = Get-EchoOutput { Invoke-WithEcho { "$doesNotExist" } | Out-Null }
         (@($lines) -match '^\s{3}\$doesNotExist\s+-\s+-\s+<not defined / null>$') | Should -Not -BeNullOrEmpty

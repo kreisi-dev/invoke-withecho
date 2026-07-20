@@ -2,7 +2,7 @@
     RootModule        = 'InvokeWithEcho.psm1'
     ModuleVersion     = '0.1.0'
     GUID              = '4a654f92-8f7b-4878-854f-67f1402cdb30'
-    Author            = 'kreisi'
+    Author            = 'Rene Kreisbeck'
     Description       = 'ECHO ON for PowerShell: runs a script block and logs the command text and variable values beforehand — ideal in combination with Start-Transcript.'
     PowerShellVersion = '5.1'
     FunctionsToExport = @('Invoke-WithEcho')

@@ -73,6 +73,6 @@ Visible in the console, captured by `Start-Transcript`, redirectable with `6>` (
 ## Tests & demo
 
 ```powershell
-Invoke-Pester tests/                     # 19 Pester tests
+Invoke-Pester tests/                     # 20 Pester tests
 pwsh -NoProfile -File examples/demo.ps1  # demo including Start-Transcript
 ```
