@@ -13,6 +13,7 @@
         PSData = @{
             Tags       = @('logging', 'echo', 'transcript', 'trace')
             ProjectUri = 'https://github.com/kreisi-dev/invoke-withecho'
+            LicenseUri = 'https://github.com/kreisi-dev/invoke-withecho/blob/main/LICENSE'
         }
     }
 }
