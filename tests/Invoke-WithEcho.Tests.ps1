@@ -2,6 +2,8 @@
     Justification = 'Test code: dummy SecureString with a fictional value to verify masking as <masked>.')]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',
     Justification = 'Test code: Write-Host inside the test block mirrors the real usage scenario (output to the information stream).')]
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidGlobalVars', '',
+    Justification = 'Test code: a global variable is the test subject (scope-prefixed resolution); it is removed in the finally block.')]
 param()
 
 BeforeAll {
