@@ -40,6 +40,12 @@ Output (also lands in the transcript via the information stream):
 | `-CommandColor` | `Cyan` | Console color of the `>>` command lines. |
 | `-ValueColor` | `DarkGray` | Console color of the variable lines. |
 | `-NoColor` | off | Write echo lines in the console's default color. |
+| `-Retry` | off | Re-invoke the block on terminating errors, with exponential backoff. |
+| `-RetryCount` | `5` | Retries after the first attempt (6 attempts in total). Implies `-Retry`. |
+| `-RetryDelaySeconds` | `2` | Delay before the first retry. Implies `-Retry`. |
+| `-RetryBackoffFactor` | `2` | Delay multiplier per retry; `1` keeps the delay fixed. Implies `-Retry`. |
+| `-RetryMaxDelaySeconds` | `60` | Upper limit for the growing delay. Implies `-Retry`. |
+| `-RetryNoticeColor` | `Yellow` | Console color of the `!!` retry notice lines. |
 
 Colors affect console rendering only — the transcript and `6>` redirection receive plain text without color codes.
 
@@ -69,6 +75,27 @@ Special cases:
 - Property and index assignments (`$obj.Prop = 5`, `$arr[0] = 5`) count as a read of the variable — the object's value is logged.
 - Increment/decrement (`$a++`) counts as a read; the pre-increment caller value is logged.
 
+### Retry: terminating errors, buffered output, exponential backoff
+
+`-Retry` (or any `Retry*` tuning parameter) re-invokes the block when it throws. Built for transient failures such as Exchange Online throttling:
+
+```powershell
+$mailboxes = Invoke-WithEcho -Retry { Get-EXOMailbox -ResultSize Unlimited }
+```
+
+Each failed attempt logs a `!!` notice to the information stream (so the transcript tells the whole story); after the last attempt the **original error record** is rethrown, so `catch [SpecificException]` at the call site keeps working.
+
+```
+>> Get-EXOMailbox -ResultSize Unlimited
+!! Attempt 1/6 failed: … - retrying in 2s
+!! Attempt 2/6 failed: … - retrying in 4s
+```
+
+- Only **terminating** errors trigger a retry — promote non-terminating ones with `-ErrorAction Stop` inside the block.
+- The default is exponential backoff (2/4/8/16/32 s, capped at `-RetryMaxDelaySeconds`), the usual guidance for throttled endpoints. `-RetryBackoffFactor 1` gives a fixed cadence, e.g. `-RetryCount 10 -RetryDelaySeconds 5 -RetryBackoffFactor 1` for 10 retries every 5 seconds.
+- While retrying, output is **buffered per attempt**: a failed attempt's partial output is discarded, and only the successful attempt's output reaches the pipeline (arriving only once the attempt completes). Without retry, output streams through as before.
+- Filtering *which* errors are retried (`-RetryOn`) is deliberately deferred to a later version.
+
 ### Output target: `Write-Host` (information stream)
 
 Visible in the console, captured by `Start-Transcript`, redirectable with `6>` (`6> echo.log`) or suppressible (`6> $null`) — and never pollutes the return value.
@@ -76,6 +103,6 @@ Visible in the console, captured by `Start-Transcript`, redirectable with `6>` (
 ## Tests & demo
 
 ```powershell
-Invoke-Pester tests/                     # 20 Pester tests
+Invoke-Pester tests/                     # 31 Pester tests
 pwsh -NoProfile -File examples/demo.ps1  # demo including Start-Transcript
 ```
