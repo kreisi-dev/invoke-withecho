@@ -4,6 +4,8 @@
     Justification = 'Test code: Write-Host inside the test block mirrors the real usage scenario (output to the information stream).')]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidGlobalVars', '',
     Justification = 'Test code: a global variable is the test subject (scope-prefixed resolution); it is removed in the finally block.')]
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingEmptyCatchBlock', '',
+    Justification = 'Test code: the retry tests assert on the echoed notice lines; the expected terminal error after the last attempt is deliberately swallowed.')]
 param()
 
 BeforeAll {
@@ -150,5 +152,111 @@ Describe 'Invoke-WithEcho' {
 
     It 'propagates errors from the block to the caller' {
         { Invoke-WithEcho { throw 'broken' } 6> $null } | Should -Throw 'broken'
+    }
+
+    Context 'retry' {
+        # Attempt counters live in a hashtable: the block runs in a child
+        # scope, so property mutation survives where $counter++ would not.
+
+        It 'runs a throwing block exactly once when retry is not enabled' {
+            $state = @{ Attempts = 0 }
+            { Invoke-WithEcho { $state.Attempts++; throw 'broken' } 6> $null } | Should -Throw 'broken'
+            $state.Attempts | Should -Be 1
+        }
+
+        It 'returns the result of the attempt that succeeds' {
+            $state = @{ Attempts = 0 }
+            $result = Invoke-WithEcho -Retry -RetryDelaySeconds 0 {
+                $state.Attempts++
+                if ($state.Attempts -lt 3) { throw 'flaky' }
+                'ok'
+            } 6> $null
+            $result | Should -Be 'ok'
+            $state.Attempts | Should -Be 3
+        }
+
+        It 'stops after RetryCount retries and rethrows' {
+            $state = @{ Attempts = 0 }
+            { Invoke-WithEcho -RetryCount 2 -RetryDelaySeconds 0 { $state.Attempts++; throw 'flaky' } 6> $null } |
+                Should -Throw 'flaky'
+            $state.Attempts | Should -Be 3
+        }
+
+        It 'enables retry when only a tuning parameter is given' {
+            $state = @{ Attempts = 0 }
+            $result = Invoke-WithEcho -RetryCount 2 -RetryDelaySeconds 0 {
+                $state.Attempts++
+                if ($state.Attempts -lt 2) { throw 'flaky' }
+                'ok'
+            } 6> $null
+            $result | Should -Be 'ok'
+            $state.Attempts | Should -Be 2
+        }
+
+        It 'logs a retry notice per failed attempt on the information stream' {
+            $lines = Get-EchoOutput {
+                try { Invoke-WithEcho -RetryCount 2 -RetryDelaySeconds 0 { throw 'flaky' } | Out-Null } catch { }
+            }
+            (@($lines) -match '^!! Attempt 1/3 failed: flaky - retrying in 0s$') | Should -Not -BeNullOrEmpty
+            (@($lines) -match '^!! Attempt 3/3 failed: flaky - giving up$') | Should -Not -BeNullOrEmpty
+        }
+
+        It 'rethrows the original error record after the last attempt' {
+            try {
+                Invoke-WithEcho -RetryCount 1 -RetryDelaySeconds 0 {
+                    throw [System.InvalidOperationException]::new('bad op')
+                } 6> $null
+                throw 'expected an InvalidOperationException'
+            }
+            catch [System.InvalidOperationException] {
+                $_.Exception.Message | Should -Be 'bad op'
+            }
+        }
+
+        It 'waits RetryDelaySeconds between attempts' {
+            $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+            { Invoke-WithEcho -RetryCount 2 -RetryDelaySeconds 0.05 -RetryBackoffFactor 1 { throw 'flaky' } 6> $null } |
+                Should -Throw 'flaky'
+            $stopwatch.Stop()
+            $stopwatch.ElapsedMilliseconds | Should -BeGreaterOrEqual 90
+        }
+
+        It 'grows the delay by RetryBackoffFactor' {
+            $lines = Get-EchoOutput {
+                try { Invoke-WithEcho -RetryCount 2 -RetryDelaySeconds 0.01 -RetryBackoffFactor 2 { throw 'flaky' } | Out-Null } catch { }
+            }
+            (@($lines) -match 'retrying in 0\.01s$') | Should -Not -BeNullOrEmpty
+            (@($lines) -match 'retrying in 0\.02s$') | Should -Not -BeNullOrEmpty
+        }
+
+        It 'caps the delay at RetryMaxDelaySeconds' {
+            $lines = Get-EchoOutput {
+                try {
+                    Invoke-WithEcho -RetryCount 2 -RetryDelaySeconds 0.02 -RetryBackoffFactor 10 -RetryMaxDelaySeconds 0.04 {
+                        throw 'flaky'
+                    } | Out-Null
+                } catch { }
+            }
+            (@($lines) -match 'retrying in 0\.02s$') | Should -Not -BeNullOrEmpty
+            (@($lines) -match 'retrying in 0\.04s$') | Should -Not -BeNullOrEmpty
+        }
+
+        It 'discards partial output of failed attempts' {
+            $state = @{ Attempts = 0 }
+            $result = Invoke-WithEcho -Retry -RetryDelaySeconds 0 {
+                $state.Attempts++
+                'a'
+                if ($state.Attempts -lt 2) { throw 'flaky' }
+                'b'
+            } 6> $null
+            $result | Should -Be @('a', 'b')
+        }
+
+        It 'echoes the command text only once across all attempts' {
+            $lines = Get-EchoOutput {
+                try { Invoke-WithEcho -RetryCount 2 -RetryDelaySeconds 0 { throw 'flaky' } | Out-Null } catch { }
+            }
+            @($lines) -match '^>> ' | Should -HaveCount 1
+        }
     }
 }

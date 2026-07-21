@@ -1,6 +1,6 @@
 ﻿@{
     RootModule        = 'InvokeWithEcho.psm1'
-    ModuleVersion     = '0.1.2'
+    ModuleVersion     = '0.2.0'
     GUID              = '4a654f92-8f7b-4878-854f-67f1402cdb30'
     Author            = 'Rene Kreisbeck'
     Description       = 'ECHO ON for PowerShell: runs a script block and logs the command text and variable values beforehand — ideal in combination with Start-Transcript.'
@@ -11,7 +11,7 @@
     AliasesToExport   = @()
     PrivateData       = @{
         PSData = @{
-            Tags       = @('logging', 'echo', 'transcript', 'trace')
+            Tags       = @('logging', 'echo', 'transcript', 'trace', 'retry')
             ProjectUri = 'https://github.com/kreisi-dev/Invoke-WithEcho'
             LicenseUri = 'https://github.com/kreisi-dev/Invoke-WithEcho/blob/main/LICENSE'
         }
